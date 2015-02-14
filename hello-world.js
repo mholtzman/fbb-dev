@@ -8,7 +8,7 @@ var port = process.env.PORT || 9080;
 app.use(parser.json());
 
 app.use(function (req, res) {
-    var db = new aws.DynamoDB({accessKeyId: 'AKIAJM3ETS42UCTXZH3Q', secretAccessKey: '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', region: 'us-east-1'});
+    var db = new aws.DynamoDB();
 
     var params = {
         TableName: 'players',
