@@ -1,0 +1,16 @@
+{
+  "name": "hello-node",
+  "version": "1.0.0",
+  "description": "Sample Application",
+  "main": "hello-world.js",
+  "dependencies": {
+    "express": "^4.11.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "test",
+		"start": "node hello-world.js"
+  },
+  "author": "Matt Holtzman",
+  "license": "ISC"
+}
