@@ -1,0 +1,19 @@
+link(rel='stylesheet', href='/stylesheets/main.css')
+
+block content
+    h1.
+        Player List
+    table(class='player-table')
+        tr
+            td= 'Name'
+            td= 'Team'
+            td= 'Positons'
+            td= 'SB'
+            td= 'HR'
+        each player in players
+            tr
+                td= player.first_name.S + " " + player.last_name.S
+                td= player.team.S
+                td= player.positions.SS
+                each stat in player.projected_stats.M
+                    td= stat.N

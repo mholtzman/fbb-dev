@@ -1,0 +1,8 @@
+table.player-table {
+    border-spacing: 0px;
+    border-collapse: collapse;
+}
+
+.player-table td { 
+    border: solid 1px #aaa;
+}

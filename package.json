@@ -8,6 +8,7 @@
     "body-parser": "^1.12.0",
     "csv-parse": "0.0.6",
     "express": "^4.11.2",
+    "jade": "^1.9.2",
     "stream-transform": "0.0.6",
     "underscore": "^1.7.0",
     "underscore.string": "^3.0.3"

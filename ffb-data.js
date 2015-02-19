@@ -1,4 +1,5 @@
 var express = require("express"),
+    path = require('path'),
     parser = require("body-parser"),
     aws = require("aws-sdk"),
     players = require("./routes/players");
@@ -68,6 +69,9 @@ var port = process.env.PORT || 9080;
         }
     });
 });*/
+
+app.set('view engine', 'jade');
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/players', players);
 
