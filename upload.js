@@ -1,25 +1,27 @@
 var fs = require('fs'),
-    csvParser = require('csv'),
+    parse = require('csv-parse'),
     aws = require('aws-sdk'),
     _ = require ('underscore'),
     _str = require('underscore.string');
 
-var credentials = new aws.SharedIniFileCredentials({profile: 'ffb'});
+var credentials = new aws.SharedIniFileCredentials({ profile: 'ffb' });
 aws.config.credentials = credentials;
 aws.config.update({ region: 'us-east-1' });
 
 function createPlayerItemRequest(playerData) {
-    var firstName = _str.strLeftBack(playerData.Name, " ");
-    var lastName = _str.strRightBack(playerData.Name, " ");
+    var firstName = playerData.first_name;
+    var lastName = playerData.last_name;
     return {
         PutRequest: {
             Item: {
                 player_id: {
-                    S: firstName.toLowerCase() + '_' + lastName.toLowerCase()
+                    S: getPlayerId(firstName, lastName)
                 },
                 first_name: { S: firstName },
                 last_name: { S: lastName },
-                projection: {
+                positions: { SS: playerData.positions.split(",") },
+                team: { S: playerData.team }
+                /*projection: {
                     M: {
                         pa: { N: playerData.PA },
                         ab: { N: playerData.AB },
@@ -35,7 +37,7 @@ function createPlayerItemRequest(playerData) {
                         sb: { N: playerData.SB },
                         cs: { N: playerData.CS }
                     }
-                }
+                }*/
             }
         }
     };
@@ -104,18 +106,30 @@ function uploadPlayerData(playerData) {
 }
 
 var upload = function(fileStream) {
-    fileStream.pipe(csvParser.parse({columns: true}, function(err, data) {
+    fileStream.pipe(parse({columns: true}, function(err, data) {
         if (err) console.log('Error: ' + err);
         else {
-            console.log('Successfully parsed projection data!');
+            console.log('Successfully parsed uploaded data!');
+
+            // DEBUG --> console.log(data);
             uploadPlayerData(data);
         }
     }));
 };
 
-exports.uploadProjections = upload;
+// convert to lowercase, remove all periods, then capitalize (for later converting to underscores)
+function normalize_id(str) {
+    return _str.replaceAll(_str.capitalize(str.toLowerCase()), "\\.", "");
+}
 
-var uploadFile = process.argv[2];
+var getPlayerId = function(firstName, lastName) {
+    return _str.underscored(normalize_id(firstName) + (lastName ? normalize_id(lastName) : ""));
+};
+
+//exports.uploadProjections = upload;
+exports.getPlayerId = getPlayerId;
+
+/*var uploadFile = process.argv[2];
 if (uploadFile) {
     var file = fs.createReadStream(uploadFile);
     file.on('error', function(err) {
@@ -125,5 +139,7 @@ if (uploadFile) {
     upload(file);
 } else {
     console.log("Enter a file to upload!");
-}
+}*/
+
+
 
