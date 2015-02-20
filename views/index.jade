@@ -1,19 +1,81 @@
-link(rel='stylesheet', href='/stylesheets/main.css')
+include mixins
 
-block content
-    h1.
-        Player List
-    table(class='player-table')
-        tr
-            td= 'Name'
-            td= 'Team'
-            td= 'Positons'
-            td= 'SB'
-            td= 'HR'
-        each player in players
-            tr
-                td= player.first_name.S + " " + player.last_name.S
-                td= player.team.S
-                td= player.positions.SS
-                each stat in player.projected_stats.M
-                    td= stat.N
+doctype
+html( lang="en" )
+    head
+        title FBB Player Valuations
+        meta( charset='utf-8' )
+        meta( name='description', content='FBB Player Valuations' )
+        link(href="//maxcdn.bootstrapcdn.com/bootswatch/3.3.0/flatly/bootstrap.min.css", rel="stylesheet")
+        link(href="//cdn.datatables.net/1.10.5/css/jquery.dataTables.css" rel="stylesheet")
+        link(href="/stylesheets/main.css" rel="stylesheet")
+
+    body( style="padding-bottom:10rem;" )
+        .container
+
+        script( src='//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js' )
+        script( src='//maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js' )
+        script( src='//cdn.datatables.net/1.10.5/js/jquery.dataTables.min.js' )
+        script( src='/scripts/table-styling.js' )
+
+        +nav("FBB Valuator", "dropdown_menu")
+            +nav_item( "index.html", "active" ) Home
+            +nav_item( "about.html" ) About
+            +nav_item( "contact.html" ) Contact
+            +nav_item_dropdown( "#" )( label="Dropdown" )
+                +nav_item( "#" ) Action
+                +nav_item( "#" ) Another action
+                +nav_item( "#" ) Something else here
+                +nav_divider
+                +nav_header Nav header
+                +nav_item( "#" ) Separated link
+                +nav_item( "#" ) One more separated link
+
+        .table-wrapper
+            h1 Player Projections
+            table.display( id='players-table', cellspacing=0, width="100%" )
+                thead
+                    tr
+                        th Name
+                        th Team
+                        th Position(s)
+                        th AVG
+                        th R
+                        th RBI
+                        th HR
+                        th SB
+
+                tfoot
+                    tr
+                        th Name
+                        th Team
+                        th Positions
+                        th SB
+                        th SB
+                        th SB
+                        th SB
+                        th SB
+
+                tbody
+                    each player in players
+                        tr
+                            td= player.first_name.S + " " + player.last_name.S
+                            td= player.team.S
+                            td= player.positions.SS
+                            td= (player.projected_stats.M.h.N / player.projected_stats.M.ab.N).toFixed(3)
+                            td= player.projected_stats.M.r.N
+                            td= player.projected_stats.M.rbi.N
+                            td= player.projected_stats.M.hr.N
+                            td= player.projected_stats.M.sb.N
+        
+        +position_sort_toolbar
+            +position_sort('All', false, "active")
+            +position_sort('C')
+            +position_sort('1B')
+            +position_sort('2B')
+            +position_sort('3B')
+            +position_sort('SS')
+            +position_sort('OF')
+            +position_sort('CI')
+            +position_sort('MI')
+            +position_sort('DH', true)

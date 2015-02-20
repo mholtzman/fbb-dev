@@ -18,7 +18,6 @@ router.get('/', function(req, resp) {
         if (err) resp.send(err);
         else resp.render('index', { players: data.Items });
     });
-    
 });
 
 router.get('/get_total', function(req, resp) {

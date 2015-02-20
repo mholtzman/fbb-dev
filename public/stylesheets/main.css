@@ -1,8 +1,34 @@
-table.player-table {
-    border-spacing: 0px;
-    border-collapse: collapse;
+.table-wrapper {
+    width: 50%;
+    padding: 0px 40px;
 }
 
-.player-table td { 
-    border: solid 1px #aaa;
+.table-wrapper tr {
+    line-height: 10px;
+}
+
+.table-wrapper h1 {
+    margin-bottom: 30px;
+}
+
+.position-sorter {
+    padding-right: 2px;
+}
+
+.position-sorter.active {
+    font-weight: bold;
+    color: red;
+}
+
+.position-sorter:not(.active):hover {
+    color: #0099ff;
+}
+
+.position-sorter:hover {
+    cursor: pointer;
+}
+
+div.toolbar {
+    float: left;
+    margin-left: 40px;
 }
