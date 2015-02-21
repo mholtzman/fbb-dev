@@ -5,19 +5,23 @@ $(document).ready(function() {
         pageLength: 25,
         pagingType: 'simple',
         lengthMenu: [ 25, 50, 100 ],
-        order: [[3, 'desc']],
+        order: [[11, 'desc']],
         columns: [
             { name: 'name' },
             { name: 'team' },
             { name: 'positions' },
+            { name: 'ab' },
+            { name: 'hits' },
             { name: 'avg' },
             { name: 'r' },
             { name: 'rbi' },
             { name: 'hr' },
             { name: 'sb' },
+            { name: 'sgp' },
+            { name: 'aSGP' }
         ],
         columnDefs: [
-            { targets: [1,3,4,5,6,7], orderSequence: ['desc'], searchable: false },
+            { targets: [1,3,4,5,6,7,8,9,10,11], orderSequence: ['desc'], searchable: false },
             { targets: [0,2], searchable: true } // only allow searching on the name column
             
         ]

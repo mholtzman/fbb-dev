@@ -41,5 +41,18 @@ mixin position_sort(position, hideDot, active)
         span.position-sorter( class=active, id=position )= position
         if !hideDot
              &#183
- 
-//- End navbar mixins
+
+mixin stats_legend
+    tr
+        th Name
+        th Team
+        th Position(s)
+        th AB
+        th H
+        th AVG
+        th R
+        th RBI
+        th HR
+        th SB
+        th SGP
+        th aSGP

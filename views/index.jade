@@ -35,38 +35,26 @@ html( lang="en" )
             h1 Player Projections
             table.display( id='players-table', cellspacing=0, width="100%" )
                 thead
-                    tr
-                        th Name
-                        th Team
-                        th Position(s)
-                        th AVG
-                        th R
-                        th RBI
-                        th HR
-                        th SB
+                    +stats_legend
 
                 tfoot
-                    tr
-                        th Name
-                        th Team
-                        th Positions
-                        th SB
-                        th SB
-                        th SB
-                        th SB
-                        th SB
+                    +stats_legend
 
                 tbody
                     each player in players
                         tr
-                            td= player.first_name.S + " " + player.last_name.S
-                            td= player.team.S
-                            td= player.positions.SS
-                            td= (player.projected_stats.M.h.N / player.projected_stats.M.ab.N).toFixed(3)
-                            td= player.projected_stats.M.r.N
-                            td= player.projected_stats.M.rbi.N
-                            td= player.projected_stats.M.hr.N
-                            td= player.projected_stats.M.sb.N
+                            td= player.name
+                            td= player.team
+                            td= player.positions
+                            td= player.projection.ab
+                            td= player.projection.h
+                            td= (player.projection.h / player.projection.ab).toFixed(3)
+                            td= player.projection.r
+                            td= player.projection.rbi
+                            td= player.projection.hr
+                            td= player.projection.sb
+                            td= player.SGP.toFixed(3)
+                            td= player.adjSGP.toFixed(3)
         
         +position_sort_toolbar
             +position_sort('All', false, "active")
