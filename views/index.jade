@@ -54,7 +54,7 @@ html( lang="en" )
                             td= player.projection.hr
                             td= player.projection.sb
                             td= player.SGP.toFixed(3)
-                            td= player.adjSGP.toFixed(3)
+                            td= (player.SGP - repLevels[player.positions[0]]).toFixed(3)
         
         +position_sort_toolbar
             +position_sort('All', false, "active")
