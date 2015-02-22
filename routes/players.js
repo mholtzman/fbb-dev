@@ -79,6 +79,12 @@ var testLeagueSettings = {
 
         return 12;
     },
+    usesCI: function() {
+        return true;
+    },
+    usesMI: function() {
+        return true;
+    },
     rosterSize: 14
 };
 
@@ -120,6 +126,84 @@ function getWeakestPosition(positions) {
 var bySGP = function(p1, p2) {
     return p2.SGP - p1.SGP;
 };
+
+var sgpIndex = function(player) {
+    return -player.sgp;
+};
+
+function PositionTracker(position, numDrafted, usesUtil) {
+    // this object is a sorted array that maintains only the top <numDrafted>
+    // players at each position; when attempting to add a new player, 
+    // if a player is removed from the array because of falling out of this range
+    // the player is returned to be moved to another position
+
+    // if usesUtil is true, only track as many players as will be drafted, as the
+    // the replacement level calculation will be based on a separate, utility pool,
+    // otherwise, track extra players in order to calculate a composite replacement level
+    this.numToTrack = numDrafted + (usesUtil ? 0 : RL_COMP_RANGE);
+    this.position = position;
+
+    this.topPlayers = [];
+}
+
+PositionTracker.prototype.canTrack = function(player) {
+    var position = (player.positions.length > 1 ? getWeakestPosition(player.positions) : player.positions[0]);
+    return position === this.position;
+};
+
+PositionTracker.prototype.addPlayer = function(player) {
+    // attempt to add a player to the tracked list and, if applicable, return a player
+    // that was removed (or the player itself if not added)
+    var removedPlayer = [player];
+    var numTracked = this.topPlayers.length;
+    if (numTracked < this.numToTrack || _.last(this.topPlayers).sgp < player.sgp) {
+        // the new player belongs in the top range, insert it in a sorted fashion
+        var index = _.sortedIndex(this.topPlayers, player, sgpIndex);
+
+        this.topPlayers.splice(index, 0, player);
+        removedPlayer = this.topPlayers.splice(this.numToTrack, 1);
+    }
+
+    return removedPlayer.length > 0 ? removedPlayer[0] : false;
+};
+
+function PlayerPool(leagueSettings) {
+    // this array is in order, and acts as a chain -- objects that are moved out
+    // of a position with a higher priority (lower index) may be moved into
+    // another position with a lower priority
+    this.leagueSettings = leagueSettings;
+
+    this.positionTrackerChain = [];
+    POSITIONS.forEach(function(position) {
+        var usesUtil = (position === 'DH') ||
+            (isCorner(position) && leagueSettings.usesCI()) ||
+            (isMiddle(position) && leagueSettings.usesMI());
+        this.chain.push(
+            new PositionTracker(position, leagueSettings.numDrafted(position), usesUtil));
+    }, { chain: this.positionTrackerChain });
+}
+
+PlayerPool.prototype.addPlayer = function(player) {
+    // attempt to add a player to each player tracker, in order
+    // if a tracker adds a player successfully and displaces another player,
+    // or if the tracker does not track the player given, keep moving down the chain
+    // until a tracker doesn't return a player to place
+    var playerToPlace = player;
+    var tracker = 0;
+
+    for (var i = 0; i < this.positionTrackerChain.length; i++) {
+        var tracker = this.positionTrackerChain[i];
+        if (tracker.canTrack(player)) {
+            playerToPlace = tracker.addPlayer(player);
+        }
+
+        if (!playerToPlace) {
+            // this means the player was added to the previous tracker
+            // and no player was displaced
+            return;
+        }
+    }
+}
 
 function PlayerTracker(leagueSettings) {
     this.leagueSettings = leagueSettings;
@@ -316,7 +400,7 @@ function GainMetrics(rawData) {
 
 
 function createPlayers(rawData, metrics) {
-    var players = new PlayerTracker(testLeagueSettings);
+    var players = new PlayerPool(testLeagueSettings);
 
     rawData.forEach(function(playerData) {
         var player = new Player(playerData);
