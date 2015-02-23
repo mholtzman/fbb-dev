@@ -4,17 +4,13 @@ var fs = require('fs'),
     _ = require ('underscore'),
     _str = require('underscore.string');
 
-var credentials = new aws.SharedIniFileCredentials({ profile: 'fbb' });
-aws.config.credentials = credentials;
-aws.config.update({ region: 'us-east-1' });
-
 var params = {
     ExpressionAttributeValues: { ":dh": { S: "DH" } },
     FilterExpression: "contains(positions, :dh)",
     TableName: 'players'
 };
 
-var db = new aws.DynamoDB();
+var db = new aws.DynamoDB({ region: 'us-east-1' });
 
 db.scan(params, function(err, data) {
     if (err) {

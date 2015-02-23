@@ -4,10 +4,6 @@ var fs = require('fs'),
     _ = require ('underscore'),
     _str = require('underscore.string');
 
-var credentials = new aws.SharedIniFileCredentials({ profile: 'fbb' });
-aws.config.credentials = credentials;
-aws.config.update({ region: 'us-east-1' });
-
 function createPlayerItemRequest(playerData) {
     var firstName = playerData.first_name;
     var lastName = playerData.last_name;
@@ -45,7 +41,7 @@ function createPlayerItemRequest(playerData) {
 
 function uploadPlayerData(playerData) {
     // data will be an array of player objects
-    var db = new aws.DynamoDB();
+    var db = new aws.DynamoDB({ region: 'us-east-1' });
 
     // check throughput of the table so we don't exceed it when batching
     db.describeTable({ TableName: 'players' }, function(err, data) {

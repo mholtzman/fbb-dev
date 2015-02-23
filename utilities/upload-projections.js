@@ -6,11 +6,7 @@ var fs = require('fs'),
     _str = require('underscore.string'),
     upload = require('./upload');
 
-var credentials = new aws.SharedIniFileCredentials({ profile: 'fbb' });
-aws.config.credentials = credentials;
-aws.config.update({ region: 'us-east-1' });
-
-var db = new aws.DynamoDB();
+var db = new aws.DynamoDB({ region: 'us-east-1' });
 
 function uploadPlayerData(playerData) {
     // data will be an array of player objects

@@ -2,10 +2,6 @@ var aws = require('aws-sdk'),
     express = require('express'),
     _ = require('underscore');
 
-var credentials = new aws.SharedIniFileCredentials({profile: 'fbb'});
-aws.config.credentials = credentials;
-aws.config.update({ region: 'us-east-1' });
-
 // in order of increasing "value" to determine which position a player should be considered as
 var POSITIONS = ["DH", "CI", "MI", "1B", "OF", "3B", "2B", "SS", "C"];
 
@@ -280,7 +276,7 @@ router.get('/', function(req, resp) {
 
     var gainPointMetrics = new GainMetrics(testMetricData);
 
-    var db = new aws.DynamoDB();
+    var db = new aws.DynamoDB({ region: 'us-east-1' });
 
     db.scan(scanParams, function(err, data) {
         if (err) resp.send(err);
@@ -298,7 +294,7 @@ router.get('/get_total', function(req, resp) {
         TableName: 'players'
     };
 
-    var db = new aws.DynamoDB();
+    var db = new aws.DynamoDB({ region: 'us-east-1' });
 
     db.scan(scanParams, function(err, data) {
         if (err) resp.end(err);
