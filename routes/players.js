@@ -2,16 +2,19 @@ var aws = require('aws-sdk'),
     express = require('express'),
     _ = require('underscore');
 
-var credentials = new aws.SharedIniFileCredentials({profile: 'ffb'});
+var credentials = new aws.SharedIniFileCredentials({profile: 'fbb'});
 aws.config.credentials = credentials;
 aws.config.update({ region: 'us-east-1' });
 
-// in order of "value" to determine which position a player should be considered as
-var POSITIONS = ["C", "SS", "3B", "2B", "OF", "1B", "DH"];
+// in order of increasing "value" to determine which position a player should be considered as
+var POSITIONS = ["DH", "CI", "MI", "1B", "OF", "3B", "2B", "SS", "C"];
+
+var byPosition = function(p1, p2) {
+    return POSITIONS.indexOf(p2) - POSITIONS.indexOf(p1);
+}
 
 // number of players to use to create a composite replacement level
-// var REP_LEVEL_SAMPLE_SIZE = 5;
-// var RL_COMP_RANGE = Math.floor(REP_LEVEL_SAMPLE_SIZE / 2);
+var REP_LEVEL_SAMPLE_SIZE = 5; // this should be odd to create an average around the replacement level player
 
 var testData = 
     [
@@ -71,7 +74,7 @@ var testLeagueSettings = {
     numDrafted: function(position) {
         switch (position) {
             case 'OF':
-                return 36;
+                return 60;
             case 'C':
                 return 24;
         }
@@ -81,18 +84,6 @@ var testLeagueSettings = {
     rosterSize: 14
 };
 
-// creates a map with on key for each position, and the default value of each
-// defined by the given constant parameter (possible values: 'array')
-function createPositionMap(defaultVal) {
-    var positionMap = {};
-
-    POSITIONS.forEach(function(position) {
-        positionMap[position] = (defaultVal === 'array' ? [] : false);
-    });
-
-    return positionMap;
-}
-
 function isCorner(position) {
     return position === '1B' || position === '3B';
 }
@@ -101,339 +92,105 @@ function isMiddle(position) {
     return position === '2B' || position === 'SS';
 }
 
-function getWeakestPosition(positions) {
-    var weakestPosition;
-    var positionIndex = POSITIONS.length;
-
-    positions.forEach(function(position) {
-        var index = POSITIONS.indexOf(position);
-        if (index < positionIndex) {
-            weakestPosition = position;
-            positionIndex = index;
-        }
-    });
-
-    return weakestPosition;
-}
-
-var bySGP = function(p1, p2) {
-    return p2.SGP - p1.SGP;
-};
-
-var sgpIndex = function(player) {
+var sortedSGPIndex = function(player) {
     return -player.SGP;
 };
 
-function getPlayerPosition(player) {
-    return (player.positions.length > 1 ? getWeakestPosition(player.positions) : player.positions[0]);
-}
-
-function createCITracker(numDrafted) {
-    return createUtilityTracker(['1B','3B'], numDrafted);
-}
-
-function createMITracker(numDrafted) {
-    return createUtilityTracker(['2B','SS'], numDrafted);
-}
-
-function createUtilTracker(numDrafted) {
-    var tracker = createUtilityTracker([], numDrafted);
-
-    tracker.canTrack = function(player) {
-        return true;
-    };
-
-    return tracker;
-}
-
-function createUtilityTracker(positions, numDrafted) {
-    var tracker = new PositionTracker();
-
-    tracker.numToTrack = numDrafted; // + RL_COMP_RANGE;
-    tracker.positions = positions;
-
-    tracker.canTrack = function(player) {
-        return this.positions.indexOf(getPlayerPosition(player)) > 0;
-    };
-
-    return tracker;
-}
-
-function PositionTracker(position, numDrafted, usesUtil) {
-    // this object is a sorted array that maintains only the top <numDrafted>
-    // players at each position; when attempting to add a new player, 
-    // if a player is removed from the array because of falling out of this range
-    // the player is returned to be moved to another position
-
-    // if usesUtil is true, only track as many players as will be drafted, as the
-    // the replacement level calculation will be based on a separate, utility pool,
-    // otherwise, track extra players in order to calculate a composite replacement level
-    this.numToTrack = numDrafted// ; + (usesUtil || numDrafted === 0 ? 0 : RL_COMP_RANGE);
-    this.position = position;
-
-    this.topPlayers = [];
-}
-
-PositionTracker.prototype.canTrack = function(player) {
-    return getPlayerPosition(player) === this.position;
+var sumValues = function(memo, sgp) {
+    return memo + sgp;
 };
 
-PositionTracker.prototype.addPlayer = function(player) {
-    // attempt to add a player to the tracked list and, if applicable, return a player
-    // that was removed (or the player itself if not added)
-    var removedPlayer = [player];
-    var numTracked = this.topPlayers.length;
-    if (numTracked < this.numToTrack || _.last(this.topPlayers).SGP < player.SGP) {
-        // the new player belongs in the top range, insert it in a sorted fashion
-        var index = _.sortedIndex(this.topPlayers, player, sgpIndex);
+function averageSGP(playerList) {
+    return _.reduce(_.pluck(playerList, 'SGP'), sumValues, 0) / playerList.length;
+}
 
-        this.topPlayers.splice(index, 0, player);
-        removedPlayer = this.topPlayers.splice(this.numToTrack, 1);
-    }
+// returns <numToFind> players in the <players> array that are eligible at the given <position>, 
+// inclusive, searching in the given direction
+function getPlayersAtPosition(numToFind, position, players, startIndex, step) {
+    var foundPlayers = [];
+    var i = startIndex;
 
-    return removedPlayer.length > 0 ? removedPlayer[0] : false;
-};
-
-PositionTracker.prototype.getReplacementLevel = function(position) {
-    if (position === 'DH') {
-        return this.topPlayers[this.topPlayers.length - 1].SGP;
-    }
-
-    // returns the lowest SGP for the given position in this tracker, or false if none exists
-    for (var i = this.topPlayers.length; --i >= 0;) {
-        var player = this.topPlayers[i];
-        if (getPlayerPosition(player) === position) {
-            return player.SGP;
+    var player;
+    while ((player = players[i]) && foundPlayers.length < numToFind) {
+        if (player.isEligible(position)) {
+            foundPlayers.push(player);
         }
+
+        i += step;
     }
 
-    return false;
-};
+    return foundPlayers;
+}
+
+// returns an average SGP at the given position, starting at the given index and
+// averaging in an equal number of players in both directions
+function getSGPAverageFrom(numToFind, position, players, startIndex) {
+    // this will be a composite of the replacement level players that can then be averaged
+    var playerRange = Math.floor(numToFind / 2);
+
+    // add 1 to the 'getNext()' call to include the actual replacement player as well
+    var replacementLevelComposite = 
+        getPlayersAtPosition(playerRange, position, players, startIndex - 1, -1).concat(
+        getPlayersAtPosition(playerRange + 1, position, players, startIndex, 1));
+
+        return averageSGP(replacementLevelComposite);
+}
 
 function PlayerPool(leagueSettings) {
-    // this array is in order, and acts as a chain -- objects that are moved out
-    // of a position with a higher priority (lower index) may be moved into
-    // another position with a lower priority
     this.leagueSettings = leagueSettings;
 
-    var numCI = leagueSettings.numDrafted('CI'),
-            numMI = leagueSettings.numDrafted('MI');
-
+    // list of all players in the player pool, sorted by SGP
     this.allPlayers = [];
-    this.positionTrackerChain = [];
-    POSITIONS.forEach(function(position) {
-        // if this is true, the tracker will not track "extra" players (beyond those that would be drafted) 
-        // in order to calculate a composite replacement level, as that will come from a larger utility pool
-        // of players (ex: 1B will not track extra players because replacement level will be determined from the CI pool)
-        if (position !== 'DH') {
-            // these will be tracked by the utility tracker as any player can play this position
-            /*var usesUtil = (position === 'DH') ||
-                (numCI > 0 && isCorner(position)) ||
-                (numMI > 0 && isMiddle(position));*/
-
-            this.chain.push(
-                new PositionTracker(position, leagueSettings.numDrafted(position)));
-        }
-    }, { chain: this.positionTrackerChain });
-
-    if (numCI > 0) {
-        this.positionTrackerChain.push(createCITracker(numCI));
-    }
-
-    if (numMI > 0) {
-        this.positionTrackerChain.push(createMITracker(numMI));
-    }
-
-    var numUtil = leagueSettings.numDrafted('Util');
-    if (numUtil > 0) {
-        this.positionTrackerChain.push(createUtilTracker(numUtil));
-    }
 }
+
+PlayerPool.prototype.markAsDrafted = function(numDrafted, position) {
+    var playerIndex = 0;
+
+    while (numDrafted > 0 && playerIndex < this.allPlayers.length) {
+        var player = this.allPlayers[playerIndex++];
+
+        // check if the player is eligible at one of the given position, or if
+        // none are given, consider all players
+        if (!player.drafted && player.isEligible(position)) {
+            // use the aSGP field as a marker -- it will be overridden later
+            player.drafted = true;
+            numDrafted--;
+        }
+    }
+
+    return playerIndex;
+} 
 
 PlayerPool.prototype.addPlayer = function(player) {
-    // attempt to add a player to each player tracker, in order
-    // if a tracker adds a player successfully and displaces another player,
-    // or if the tracker does not track the player given, keep moving down the chain
-    // until a tracker doesn't return a player to place
-    this.allPlayers.push(player);
+    this.allPlayers.splice(_.sortedIndex(this.allPlayers, player, sortedSGPIndex), 0, player);
+};
 
-    var playerToPlace = player;
-    var tracker = 0;
-
-    for (var i = 0; i < this.positionTrackerChain.length; i++) {
-        var tracker = this.positionTrackerChain[i];
-        if (tracker.canTrack(playerToPlace)) {
-            playerToPlace = tracker.addPlayer(playerToPlace);
-        }
-
-        if (!playerToPlace) {
-            // this means the player was added to the previous tracker
-            // and no player was displaced
-            return;
-        }
-    }
-}
-
-PlayerPool.prototype.getReplacementLevels = function() {
-    var repLevels = {};
-
-    // for each position, iterate up the chain until we find the lowest value at the position
-    POSITIONS.forEach(function(position) {
-        for (var i = this.chain.length; --i >= 0;) {
-            var sgp = this.chain[i].getReplacementLevel(position);
-            if (sgp) {
-                repLevels[position]= sgp;
-                break;
-            }
-        }
-    }, { chain: this.positionTrackerChain });
-
-    return repLevels;
-}
-
-PlayerPool.prototype.getPlayers = function() {
+PlayerPool.prototype.getAllPlayers = function() {
     return this.allPlayers;
 };
 
-function PlayerTracker(leagueSettings) {
-    this.leagueSettings = leagueSettings;
+PlayerPool.prototype.getReplacementLevels = function() {
+    var replacementLevels = {};
 
-    // tracks all players aleady evaluated in sorted order
-    this.positionMap = createPositionMap('array');
+    // store the index of the replacement level player for each position so we don't have to
+    // traverse the array again to find it
+    var startIndices = {};
 
-    // maintain list of all players to be returned later
-    this.allPlayers = [];
-
-    // adds a player to the given sorted list, maintaining the sort,
-    // then adds the player to the list of all players in the same fashion
-    this.trackPlayer = function(trackingList, player) {
-        var index = _.sortedIndex(trackingList, player, function(player) {
-            return -player.SGP;
-        });
-
-        trackingList.splice(index, 0, player);
-
-        index = _.sortedIndex(this.allPlayers, player, function(player) {
-            return -player.SGP;
-        });
-
-        this.allPlayers.splice(index, 0, player);
-    };
-
-    this.getUtilityList = function(position) {
-        return (isCorner(position) ? this.corners : (isMiddle(position) ? this.middles : (position === 'DH' ? this.allPlayers : false)));
+    // first, mark the players that would be drafted at each position, note that the order here is important
+    // as the utility slots will now be filled in last
+    for (var i = POSITIONS.length; --i >= 0;) {
+        var position = POSITIONS[i];
+        startIndices[position] = this.markAsDrafted(this.leagueSettings.numDrafted(position), position);
     }
 
-    // number of players that need to be tracked in order to
-    // properly calculate a composite replacement level
-   // this.numToTrack = leagueSettings.numTeams + Math.floor(REP_LEVEL_COMP_SIZE / 2);
+    // then, find the composite players to calculate replacement level
+    POSITIONS.forEach(function(position) {
+        replacementLevels[position] = 
+            getSGPAverageFrom(REP_LEVEL_SAMPLE_SIZE, position, this.allPlayers, startIndices[position]);
+        console.log("Replacement level for " + position + ": " + replacementLevels[position]);
+    }, this);
 
-    //this.corners = leagueSettings.numCorners * leagueSettings.numTeams;
-    //this.middles = leagueSettings.numMiddles * leagueSettings.numTeams;
-
-    /*this.trackPlayer = function(position) {
-        var t = this.numExtraToTrack;
-
-        // check to track players in the following order:
-        //  1. players that would be drafted to play at the specific position
-        //  2. players that would be played at the position but would be drafted as a CI/MI
-        //  3. players needed to calculate the composite replacement level
-        if (this.tracker[position].length < this.numToTrack) {
-            return true;
-        } else {
-            return this.tracker[position].length < this.numToTrack || 
-                (isCorner(position) && (this.corners-- > 0 || this. ||
-                (isMiddle(position) && this.middles-- > 0);
-        }
-    }*/
-}
-
-PlayerTracker.prototype.addPlayer = function(player) {
-    // slot each player into their "weakest" position
-    var position = (player.positions.length > 1 ? getWeakestPosition(player.positions) : player.positions[0]);
-    this.trackPlayer(this.positionMap[position], player);
-
-    // then add the player to any utility spots, if applicable
-    /*var utilList = this.getUtilityList(position);
-    if (utilList) {
-        trackPlayer(utilList, player);
-    }*/
-};
-
-PlayerTracker.prototype.getPlayers = function() {
-    return this.allPlayers; 
-}
-
-function averageSGP(playerList) {
-    return _.reduce(_.pluck(playerList, 'SGP'), function(memo, sgp) {
-        return memo + sgp;
-    }, 0) / playerList.length;
-}
-
-function getCorners(allPlayers, numPlayers) {
-    return _.filter(allPlayers, function(player) {
-        return player.positions.indexOf("1B") >= 0 || player.positions.indexOf("3B") >= 0;
-    }).slice(0, numPlayers);
-}
-
-function getMiddles(allPlayers, numPlayers) {
-    return _.filter(allPlayers, function(player) {
-        return player.positions.indexOf("2B") >= 0 || player.positions.indexOf("SS") >= 0;
-    }).slice(0, numPlayers);
-}
-
-function getUtil(allPlayers, numPlayers) {
-    return allPlayers.slice(20, 20 + numPlayers);
-}
-
-function calculateReplacementValue(draftedPlayers, utilPlayers, numDrafted) {
-    var playerList = draftedPlayers.concat(utilPlayers).sort(bySGP);
-    return averageSGP(playerList.slice(numDrafted, numDrafted + 1));
-}
-
-PlayerTracker.prototype.calculateReplacementLevel = function() {
-    // build list of utility players that will be drafted
-    // FIXME there has to be a more efficient way to do this
-
-    // remove players from the utility list that will be drafted at 
-    // their "natural" position
-    var utilityList = this.allPlayers.slice();
-    for (var position in this.positionMap) {
-        var positionList = this.positionMap[position];
-        for (var i = 0; i < this.leagueSettings.numDrafted(position); i++) {
-            utilityList.splice(utilityList.indexOf(positionList[i]), 1);
-        }
-    }
-
-    for (var position in this.positionMap) {
-        // positionList is sorted in order of SGP, so we just need to find the replacement
-        // level and apply the offset to each player
-        var numDrafted = this.leagueSettings.numDrafted(position);
-
-        var positionList = this.positionMap[position];
-
-        // first we need to move the utility players into this list, if applicable,
-        // to accurately measure the baseline against the draftable pool of players
-        var rlSGP = 0;
-
-        if (isCorner(position)) {
-            rlSGP = calculateReplacementValue(positionList.slice(0, numDrafted), getCorners(utilityList, numDrafted), numDrafted * 2);
-        } else if (isMiddle(position)) {
-             rlSGP = calculateReplacementValue(positionList.slice(0, numDrafted), getMiddles(utilityList, numDrafted), numDrafted * 2);
-        } else if (position === 'DH') {
-            rlSGP = calculateReplacementValue(positionList.slice(0, numDrafted), getUtil(utilityList, numDrafted), numDrafted);
-        }
-        else {
-            // calculate replacement level SGP using a composite of players around
-            // the last player that would be drafted
-            rlSGP = averageSGP(positionList.slice(numDrafted, numDrafted));
-        }
-
-        // finally, apply the replacement level adjustment to each player in the list
-        positionList.forEach(function(player) {
-            player.adjSGP = (player.SGP - rlSGP);
-        });
-    }
+    return replacementLevels;
 };
 
 function Projection(rawData) {
@@ -448,13 +205,24 @@ function Projection(rawData) {
 function Player(rawData, metrics) {
     this.name = rawData.first_name.S + " " + rawData.last_name.S;
     this.team = rawData.team.S;
-    this.positions = rawData.positions.SS; // array of positions
+
+    // sort the array of positions so that the most "valuable" position is first
+    var positionArr = rawData.positions.SS;
+    if (positionArr.length > 1) {
+        positionArr.sort(byPosition);
+    }
+
+    this.positions = positionArr;
     this.projection = new Projection(rawData.projected_stats.M);
 }
 
-Player.prototype.toString = function() {
-    return this.name;
-}
+Player.prototype.isEligible = function(position) {
+    // all players are eligible at Util
+    return (this.positions[0] === position || 
+        position === "DH" ||
+        (position === "CI" && isCorner(this.positions[0])) ||
+        (position === "MI" && isCorner(this.positions[0])));
+};
 
 Player.prototype.calculateSGP = function(leagueSettings, metrics) {
     var avgHits = (metrics.baselines.avg * metrics.baselines.abs);
@@ -471,7 +239,7 @@ Player.prototype.calculateSGP = function(leagueSettings, metrics) {
         (this.projection.rbi / amtPerGainPt.rbi) +
         (this.projection.hr / amtPerGainPt.hr) +
         (this.projection.sb / amtPerGainPt.sb);
-}
+};
 
 function GainMetrics(rawData) {
     this.amtPerGainPoint = {
@@ -494,6 +262,7 @@ function createPlayers(rawData, metrics) {
 
     rawData.forEach(function(playerData) {
         var player = new Player(playerData);
+
         player.calculateSGP(testLeagueSettings, metrics);
 
         players.addPlayer(player);
@@ -519,7 +288,7 @@ router.get('/', function(req, resp) {
             // use data to create player objects
             var players = createPlayers(data.Items, gainPointMetrics);
 
-            resp.render('index', { players: players.getPlayers(), repLevels : players.getReplacementLevels() });
+            resp.render('index', { players: players.getAllPlayers(), repLevels: players.getReplacementLevels() });
         }
     });
 });

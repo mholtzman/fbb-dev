@@ -21,8 +21,8 @@ $(document).ready(function() {
             { name: 'aSGP' }
         ],
         columnDefs: [
-            { targets: [1,3,4,5,6,7,8,9,10,11], orderSequence: ['desc'], searchable: false },
-            { targets: [0,2], searchable: true } // only allow searching on the name column
+            { targets: [3,4,5,6,7,8,9,10,11], orderSequence: ['desc'], searchable: false },
+            { targets: [0,1,2], searchable: true, orderable: false } // these columns can be filtered, but not sored
             
         ]
     });
@@ -45,6 +45,10 @@ $(document).ready(function() {
         table.column( 'name:name' ).search(searchBox.val()).draw();
     });
 } );
+
+function getPlayerPosition(player) {
+    return 'SS';
+}
 
 var selectedSorter;
 

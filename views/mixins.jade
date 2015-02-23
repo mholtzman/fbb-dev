@@ -39,8 +39,8 @@ mixin position_sort_toolbar
 mixin position_sort(position, hideDot, active)
     li( role="presentation" )
         span.position-sorter( class=active, id=position )= position
-        if !hideDot
-             &#183
+        unless hideDot
+            | &#183
 
 mixin stats_legend
     tr

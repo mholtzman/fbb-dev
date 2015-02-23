@@ -4,7 +4,7 @@ var fs = require('fs'),
     _ = require ('underscore'),
     _str = require('underscore.string');
 
-var credentials = new aws.SharedIniFileCredentials({ profile: 'ffb' });
+var credentials = new aws.SharedIniFileCredentials({ profile: 'fbb' });
 aws.config.credentials = credentials;
 aws.config.update({ region: 'us-east-1' });
 
