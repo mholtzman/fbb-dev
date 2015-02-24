@@ -15,6 +15,8 @@
   },
   "devDependencies": {
     "csv": "^0.4.1",
+    "csv-generate": "0.0.4",
+    "csv-stringify": "0.0.6",
     "should": "^5.0.0"
   },
   "scripts": {
