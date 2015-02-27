@@ -1,21 +1,23 @@
-var fs = require('fs'),
-    parse = require('csv-parse'),
+var parse = require('csv-parse'),
+    transform = require('stream-transform'),
     aws = require('aws-sdk'),
     _ = require ('underscore'),
     _str = require('underscore.string');
 
-function createPlayerItemRequest(playerData) {
-    var firstName = playerData.first_name;
-    var lastName = playerData.last_name;
+function createPlayerItemRequest(playerData, site) {
+    var positionMap = {
+        M: {}
+    };
+
+    positionMap.M[site] = { SS: playerData.positions.split(",") };
+
     return {
         PutRequest: {
             Item: {
-                player_id: {
-                    S: getPlayerId(firstName, lastName)
-                },
-                first_name: { S: firstName },
-                last_name: { S: lastName },
-                positions: { SS: playerData.positions.split(",") },
+                player_id: { S: playerData.player_id },
+                first_name: { S: playerData.first_name },
+                last_name: { S: playerData.last_name },
+                positions: positionMap,
                 team: { S: playerData.team }
                 /*projection: {
                     M: {
@@ -39,7 +41,7 @@ function createPlayerItemRequest(playerData) {
     };
 }
 
-function uploadPlayerData(playerData) {
+function uploadPlayerData(playerData, site) {
     // data will be an array of player objects
     var db = new aws.DynamoDB({ region: 'us-east-1' });
 
@@ -66,7 +68,7 @@ function uploadPlayerData(playerData) {
 
                 var batchSize = Math.min(writeThroughput, leftToProcess);
                 for (var i = 0; i < batchSize; i++) {
-                    batchParams.RequestItems.players.push(createPlayerItemRequest(playerData.shift()));
+                    batchParams.RequestItems.players.push(createPlayerItemRequest(playerData.shift(), site));
                     leftToProcess--;
                 }
 
@@ -101,41 +103,21 @@ function uploadPlayerData(playerData) {
     });
 }
 
-var upload = function(fileStream) {
-    fileStream.pipe(parse({columns: true}, function(err, data) {
-        if (err) console.log('Error: ' + err);
+var upload = function(stream, site) {
+    stream.pipe(parse({columns: true}, function(err, data) {
+        if (err) {
+            console.log('error: ' + err);
+        }
         else {
-            console.log('Successfully parsed uploaded data!');
+            console.log('cuccessfully parsed uploaded data!');
 
-            // DEBUG --> console.log(data);
-            uploadPlayerData(data);
+
+            console.log("uploading " + site + " data");
+            uploadPlayerData(data, site);
         }
     }));
 };
 
-// convert to lowercase, remove all periods, then capitalize (for later converting to underscores)
-function normalize_id(str) {
-    return _str.replaceAll(_str.capitalize(str.toLowerCase()), "\\.", "");
-}
-
-var getPlayerId = function(firstName, lastName) {
-    return _str.underscored(normalize_id(firstName) + (lastName ? normalize_id(lastName) : ""));
-};
-
-//exports.uploadProjections = upload;
-exports.getPlayerId = getPlayerId;
-
-/*var uploadFile = process.argv[2];
-if (uploadFile) {
-    var file = fs.createReadStream(uploadFile);
-    file.on('error', function(err) {
-        console.log("error opening stream: " + err);
-    });
-
-    upload(file);
-} else {
-    console.log("Enter a file to upload!");
-}*/
-
+module.exports = upload;
 
 

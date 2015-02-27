@@ -7,55 +7,18 @@ var fs = require('fs'),
     _ = require ('underscore'),
     Q = require('q'),
     _str = require('underscore.string'),
-    utils = require('./data-utils');
+    utils = require('./data-utils'),
+    parsers = require('./parsers'),
+    positions = require('./position-utils'),
+    upload = require('./upload-utils'),
+    nconf = require('nconf');
 
-/*var params = {
-    ExpressionAttributeValues: { ":dh": { S: "DH" } },
-    FilterExpression: "contains(positions, :dh)",
-    TableName: 'players'
-};
-
-var db = new aws.DynamoDB({ region: 'us-east-1' });
-
-db.scan(params, function(err, data) {
-    if (err) {
-        console.error("error: " + err);
-    } else {
-        data.Items.forEach(function(item) {
-            var positions = item.positions.SS;
-
-            if (positions.length > 1) {
-                positions.splice(positions.indexOf("DH"), 1);
-            }
-
-            console.log(item.player_id.S + ": " + positions);
-
-            var params = {
-                TableName: 'players',
-                Key: {
-                    player_id: {
-                        S: item.player_id.S
-                    },
-                },
-                UpdateExpression: 'set positions = :new_pos',
-                ExpressionAttributeValues: {
-                    ":new_pos": { SS: positions }
-                }
-            };
-
-            db.updateItem(params, function(err, data) {
-                if (err) {
-                    console.error("error: " + err);
-                }
-            });
-        });
-    }
-});*/
+nconf.env();
 
 // returns a stream
 var getPlayerNames = function(uploadFile, callback, batters, pitchers) {
     if (uploadFile) {
-        var file = loadCSV(uploadFile);
+        var file = openCSV(uploadFile);
         var parser = parse({ columns: true });
 
         var players = [];
@@ -87,202 +50,193 @@ var normalizeColumns = function(cols) {
 // adds player IDs, removes specific "OF" positions, removes DH unless it's the only position, and sorts positions
 var normalizeFile = function(uploadFile) {
     if (uploadFile) {
-        var file = loadCSV(uploadFile);
+        var file = openCSV(uploadFile);
         var parser = parse({ columns: normalizeColumns });
         var stringer = stringify({ header: true });
 
         var players = [];
 
         var transformer = transform(function(player) {
-            player.playerId = utils.getPlayerId(player.first_name, player.last_name);
-            player.positions = normalizePositions(player.positions);
+            player.player_id = utils.getPlayerId(player.first_name, player.last_name);
+            player.positions = positions.normalize(player.positions);
                 
             return player;
         });
 
-        file.pipe(parser).pipe(transformer).pipe(stringer).pipe(writeCSV('..\\data\\2015-espn-parsed.csv'));
+        file.pipe(parser).pipe(transformer).pipe(stringer).pipe(writeCSV('..\\data\\' + _str.strLeftBack(uploadFile, ".") + '-normalized.csv'));
     } else {
         console.log("Enter a CSV file to read!");
     }
 };
 
-function isPositionPlayer(positions) {
-    return !_str.include(positions, "SP") && !_str.include(positions, "RP");
-}
+// strips players from the first file that don't appear in any of the others
+var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
+    var playerLists = [];
+    var lastNameLists = [];
 
-// in order of increasing "value" to determine which position a player should be considered as
-var POSITIONS = ["DH", "1B", "RF", "LF", "CF", "3B", "2B", "SS", "C"];
-var OF_POSITIONS = ["RF", "LF", "CF"];
+    var removeOutliers = function() {
+        var allPlayers = _.union.apply(this, playerLists);
+        var allLastNames = _.union.apply(this, lastNameLists);
 
-var byPosition = function(p1, p2) {
-    return POSITIONS.indexOf(p2) - POSITIONS.indexOf(p1);
-}
+        var fileStream = openCSV(fileToStrip);
 
-function normalizePositions(positions) {
-    // change slashes to commas
-    var normalizedPosition = _str.replaceAll(positions, '/', ',');
+        var parser = parse({ columns: true });
+        var stringer = stringify({ header: true });
 
-    // turn into array for processing
-    normalizedPosition = normalizedPosition.split(",");
-
-    // change RF,LF,CF positions to OF
-    if (_.some(normalizedPosition, function(position) {
-        return _.contains(OF_POSITIONS, position);
-    })) {
-        normalizedPosition = _.without(normalizedPosition, OF_POSITIONS);
-        normalizedPosition.push("OF");
-    }
-
-    // remove DH unless it's the only positions
-    if (normalizedPosition.length > 1) {
-        normalizedPosition = _.without(normalizedPosition, "DH");
-    }
-
-    // then sort and turn back into a string
-    return normalizedPosition.sort(byPosition).join(",");
-}
-
-// first file is a list of players of interest, second file is another file where all records
-// corresponding to players not in the first file will be removed
-/*var mergeData = function(fileToKeep, fileToParse, callback, playersToKeep) {
-    if (fileToKeep && fileToParse) {
-        getPlayerNames(fileToKeep, function(err, players) {
-            if (err) {
-                return console.error("error parsing file to keep: " + err);
-            } else {
-                var file = loadCSV(fileToParse);
-                var parser = parse({ columns: true });
-                var toString = stringify();
-
-                var playerData = [];
-                var ignored = [];
-
-                var transformer = transform(function(data) {
-                    var playerId = utils.getPlayerId(data[0]);
-                    if (_.contains(players, playerId)) {
-                        for (var i = 3; i < data.length; i++) {
-                            data[i] = normalizePositions(data[i]);
-                        }
-
-                        return data;
-                    } else {
-                        ignored.push(playerId);
-                    }
-                });
-
-                transformer.on('finish', function() {
-                    console.log("parsed and kept " + players.length + " player records, ignored " + ignored.length);
-                });
-
-                var output = writeCSV('2015-master.csv');
-
-                file.pipe(parser).pipe(transformer).pipe(toString).pipe(output);
+        // create an array of player IDs
+        var transformer = transform(function(player) {
+            if (_.contains(allPlayers, player.player_id)) {
+                return player;
+            } else if (dryRun) {
+                console.log("would remove " + player.player_id + (_.contains(allLastNames, player.last_name) ? " *******************" : ""));
             }
         });
-    } else {
-        console.log("Enter two CSV files to read!");
-    }
-}*/
 
-var scrapeESPN = function(outputFile) {
-    var baseUrl = "http://games.espn.go.com/flb/tools/projections?display=alt&startIndex=";
-    var pageIndex = 0;
+        var pipe = fileStream.pipe(parser).pipe(transformer); 
+        if (!dryRun) {
+            pipe.pipe(stringer).pipe(writeCSV('..\\data\\' + _str.strLeftBack(fileToStrip, ".") + '-stripped.csv'));
+        }
+    };
 
-    var maxPlayers = 600;
-    var playersPerPage = 15; // for ESPN, we need to scrape 15 players at a time
+    var fileDone = _.after(filesToCompare.length, removeOutliers);
 
-    var requestFinishedCB = _.after(maxPlayers / playersPerPage, function() {
-        console.log("all requests done!");
-        outputStream.end();
-    });
+    filesToCompare.forEach(function(file, index) {
+        playerLists.push([]);
+        lastNameLists.push([]);
+        var fileStream = openCSV(file);
+
+        var parser = parse({ columns: true });
+
+        // create an array of player IDs
+        var transformer = transform(function(player) {
+            playerLists[index].push(player.player_id);
+            lastNameLists[index].push(player.last_name);
+        });
+
+        transformer.on('finish', function() {
+            console.log("done reading " + file);
+            fileDone();
+        });
+
+        fileStream.pipe(parser).pipe(transformer);
+    });    
+};
+
+var scrapeESPN = function(outputFile, pitchers) {
+    var baseUrl = "http://games.espn.go.com/flb/tools/projections?display=alt&startIndex=";v
 
     var outputStream = writeCSV(outputFile);
     if (outputStream) {
+        var requests = [];
+        var parser = new parsers.ESPNParser(pitchers ? positions.PitcherSelector : positions.BatterSelector);
+
         // first call will include the categories, the rest will just be stats
-        scrapeHTML(baseUrl + "0", outputStream, requestFinishedCB, true).then(function() {
-            while ((pageIndex += playersPerPage) < maxPlayers) {
-                scrapeHTML(baseUrl + pageIndex, outputStream, requestFinishedCB);
-            }
+        while (pageIndex < maxPlayers) {
+            requests.push(scrapeHTML(baseUrl + pageIndex, parser, pageIndex === 0));
+
+            pageIndex += playersPerPage;
+        }
+
+        Q.all(requests).then(function(allData) {
+            console.log("all requests done, writing file!");
+
+            var stringer = stringify();
+
+            stringer.pipe(outputStream);
+
+            allData.forEach(function(requestData) {
+                requestData.forEach(function(row) {
+                    stringer.write(row);
+                });
+            });
+
+            stringer.end();
         });
     }
 };
 
-var scrapeHTML = function(url, outputStream, finishedCB, includeCategories, playerSelector) {
+var scrapeCBS = function(outputFile, pitchers) {
+    // CBS groups projections by position only
+    var baseUrl = "http://fantasynews.cbssports.com/fantasybaseball/stats/sortable/cbs/%s/season/standard/projections?&start_row=";
+    var pageIndex;
+
+    var maxPlayersPerPosition = (pitchers ? 250 : 150);
+    var playersPerPage = 50; // for CBS, we need to scrape 50 players at a time
+
+    var outputStream = writeCSV(outputFile);
+    if (outputStream) {
+        var requests = [];
+
+        var positionSet = (pitchers ? positions.pitcherPositions() : positions.batterPositions());
+
+        // first call will include the categories, the rest will just be stats
+        positionSet.forEach(function(position, index) {
+            pageIndex = 1;
+             while (pageIndex < maxPlayersPerPosition) {
+                var statSelector = (pitchers ? (position === "SP" ? new positions.IPSelector(80) : new positions.IPSelector(40)) : new positions.ABSelector(200));
+                requests.push(scrapeHTML(_str.sprintf((baseUrl + pageIndex), position), new parsers.CBSParser(statSelector, position), (index + pageIndex) === 1));
+            
+                pageIndex += playersPerPage;
+            }
+        });
+
+        Q.all(requests).then(function(allData) {
+            console.log("all requests done, writing file!");
+
+            var allPlayers = [];
+            var stringer = stringify();
+
+            // remove duplicates
+            var transformer = transform(function(player) {
+                if (!_.contains(allPlayers, player[0])) {
+                    allPlayers.push(player[0]);
+                    return player;
+                }
+            });
+
+            transformer.pipe(stringer).pipe(outputStream);
+
+            allData.forEach(function(requestData) {
+                requestData.forEach(function(row) {
+                    transformer.write(row);
+                });
+            });
+
+            transformer.end();
+        });
+    }
+};
+
+var scrapeHTML = function(url, siteParser, includeCategories) {
     var requestDone = Q.defer();
 
-    request(url, function(err, response, html) {
+    request({ url: url }, function(err, response, html) {
         if (err) {
             console.log("error scraping " + url + ": " + error);
             return;
         }
 
-        var stringer = stringify();
-
-        stringer.on('readable', function(){
-            while (row = stringer.read()) {
-                outputStream.write(row);
-            }
-        });
-
         var $ = cheerio.load(html);
-        var players = [];
+        var scrapedData = siteParser.parse($, includeCategories);
 
-        if (includeCategories) {
-            var categories = ['player_id','first_name','last_name','team','positions'];
+        console.log("request to " + url + " scraped data for " + scrapedData.length + " players");
 
-            // scrape the categories
-            $('div.games-fullcol table').first().find('tr.tableSubHead td.playertableStat').each(function() {
-                categories.push($(this).text().toLowerCase());
-            });
-
-            stringer.write(categories);
-        }
-
-        $('div.games-fullcol table').not(function() {
-            var playerData = $(this).find('.subheadPlayerNameLink').text();
-            var positions = _str.strRightBack(_str.replaceAll(playerData, ", ", ","), " ");
-            return !isPositionPlayer(positions);
-        }).each(function() {
-            var player = [];
-
-            // first scrape player name, team, position
-            var playerData = $(this).find('.subheadPlayerNameLink').text();
-
-            // remove ranking info
-            var playerInfo = _str.words(_str.replaceAll(_str.strRight(playerData, ". "), ",", ""));
-            var firstName = playerInfo[0];
-            var lastName = playerInfo[1];
-
-            player.push(utils.getPlayerId(firstName, lastName));
-            player.push(firstName);
-            player.push(lastName);
-            player.push(playerInfo[2].toUpperCase()); // team
-            player.push(normalizePositions(_.rest(playerInfo, 3).join(","))); // positions
-
-            // then scrape stats
-            var stats = $(this).find('tr.tableBody').first().find('td.playertableStat').each(function() {
-                player.push($(this).text());
-            });
-
-            players.push(player);
-        });
-
-        players.forEach(function(player) {
-            stringer.write(player);
-        });
-
-       // stringer.unpipe();
-        stringer.end();
-
-        finishedCB();
-
-        requestDone.resolve();
+        requestDone.resolve(scrapedData);
     });
 
     return requestDone.promise;
 };
 
-var loadCSV = function(uploadFile) {
+var uploadFile = function(file, site) {
+    var fileStream = openCSV(file);
+    if (fileStream) {
+        upload(fileStream, site);
+    } else {
+        console.error("couldn't open file: " + file);
+    }
+};
+
+var openCSV = function(uploadFile) {
     var file = fs.createReadStream(uploadFile);
     file.on('error', function(err) {
         console.log("error opening stream: " + err);
@@ -303,7 +257,7 @@ var writeCSV = function(fileToWrite) {
 
 exports.getPlayerNames = getPlayerNames;
 
-var KNOWN_SCRIPTS = ["normalize-file","download-data"];
+var KNOWN_SCRIPTS = ["normalize-file","download-data","intersect-files","upload-file"];
 
 var scriptName = process.argv[2];
 if (scriptName) {
@@ -312,7 +266,35 @@ if (scriptName) {
             return normalizeFile(process.argv[3]);
         }
         case KNOWN_SCRIPTS[1]: {
-            return scrapeESPN(process.argv[3]);
+            var siteIndex = process.argv.indexOf("--site");
+            var scraper;
+            if (siteIndex > 0) {
+                if (process.argv[siteIndex + 1] === 'espn') {
+                    scraper = scrapeESPN;
+                } else if (process.argv[siteIndex + 1] === 'cbs') {
+                    scraper = scrapeCBS;
+                }
+            }
+
+            if (!scraper) {
+                console.error('please specify a site to get data from! usage: --site [espn|cbs]');
+                return;
+            }
+
+            return scraper(process.argv[3], process.argv.indexOf('--pitchers') > 0);
+        }
+        case KNOWN_SCRIPTS[2]: {
+            var dryRun = false;
+            var fileStartIndex = 3;
+            if (process.argv.indexOf('--dryrun') > 0) {
+                dryRun = true;
+                fileStartIndex = 4;
+            }
+            return intersectFiles(process.argv[fileStartIndex], _.rest(process.argv, fileStartIndex + 1), dryRun);
+        }
+        case KNOWN_SCRIPTS[3]: {
+            var siteIndex = process.argv.indexOf("--site");
+            return uploadFile(process.argv[3], process.argv[siteIndex + 1]);
         }
         default: {
             console.error("unknown script! options: " + KNOWN_SCRIPTS.toString());

@@ -13,6 +13,7 @@
     "q": "^1.1.2",
     "request": "^2.53.0",
     "stream-transform": "0.0.6",
+    "tough-cookie": "^0.12.1",
     "underscore": "^1.7.0",
     "underscore.string": "^3.0.3"
   },
