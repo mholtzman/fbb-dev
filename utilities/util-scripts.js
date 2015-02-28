@@ -1,5 +1,4 @@
-var fs = require('fs'),
-    parse = require('csv-parse'),
+var parse = require('csv-parse'),
     transform = require('stream-transform'),
     stringify = require('csv-stringify'),
     request = require('request'),
@@ -123,7 +122,7 @@ var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
 };
 
 var scrapeESPN = function(outputFile, pitchers) {
-    var baseUrl = "http://games.espn.go.com/flb/tools/projections?display=alt&startIndex=";v
+    var baseUrl = "http://games.espn.go.com/flb/tools/projections?display=alt&startIndex=";
 
     var outputStream = writeCSV(outputFile);
     if (outputStream) {
@@ -227,37 +226,18 @@ var scrapeHTML = function(url, siteParser, includeCategories) {
     return requestDone.promise;
 };
 
-var uploadFile = function(file, site) {
-    var fileStream = openCSV(file);
-    if (fileStream) {
-        upload(fileStream, site);
-    } else {
-        console.error("couldn't open file: " + file);
+var KNOWN_SCRIPTS = ["normalize-file","download-data","intersect-files","upload-player-data","upload-projections"];
+
+function getSiteParam(args) {
+    var index = args.indexOf("--site") + 1;
+    if (index > 0) {
+        return args[index];
     }
-};
+}
 
-var openCSV = function(uploadFile) {
-    var file = fs.createReadStream(uploadFile);
-    file.on('error', function(err) {
-        console.log("error opening stream: " + err);
-    });
-
-    return file;    
-};
-
-var writeCSV = function(fileToWrite) {
-    var file = fs.createWriteStream(fileToWrite);
-    file.on('error', function(err) {
-        console.log("error opening stream: " + err);
-    });
-
-    return file;    
-};
-
-
-exports.getPlayerNames = getPlayerNames;
-
-var KNOWN_SCRIPTS = ["normalize-file","download-data","intersect-files","upload-file"];
+function showUsage(error, util) {
+    console.error(error + "! usage: node util-scripts " + util + " <[file1, file2 ..]> --site [cbs|espn|zips]");
+}
 
 var scriptName = process.argv[2];
 if (scriptName) {
@@ -293,8 +273,20 @@ if (scriptName) {
             return intersectFiles(process.argv[fileStartIndex], _.rest(process.argv, fileStartIndex + 1), dryRun);
         }
         case KNOWN_SCRIPTS[3]: {
-            var siteIndex = process.argv.indexOf("--site");
-            return uploadFile(process.argv[3], process.argv[siteIndex + 1]);
+            var site = getSiteParam(process.argv);
+            if (!site) {
+                showUsage("no site specified", scriptName);
+                return;
+            }
+            return upload.playerData(process.argv[3], site);
+        }
+        case KNOWN_SCRIPTS[4]: {
+            var site = getSiteParam(process.argv);
+            if (!site) {
+                showUsage("no site specified", scriptName);
+                return;
+            }
+            return upload.projectionData(process.argv[3], site);
         }
         default: {
             console.error("unknown script! options: " + KNOWN_SCRIPTS.toString());
