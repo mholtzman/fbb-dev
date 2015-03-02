@@ -9,7 +9,9 @@ var parse = require('csv-parse'),
     utils = require('./data-utils'),
     parsers = require('./parsers'),
     positions = require('./position-utils'),
+    projections = require('./projection-utils'),
     upload = require('./upload-utils'),
+    file = require('./file-utils'),
     nconf = require('nconf');
 
 nconf.env();
@@ -17,7 +19,7 @@ nconf.env();
 // returns a stream
 var getPlayerNames = function(uploadFile, callback, batters, pitchers) {
     if (uploadFile) {
-        var file = openCSV(uploadFile);
+        var file = file.openCSV(uploadFile);
         var parser = parse({ columns: true });
 
         var players = [];
@@ -36,35 +38,24 @@ var getPlayerNames = function(uploadFile, callback, batters, pitchers) {
     }
 };
 
-var normalizeColumns = function(cols) {
-    for (var i = 0; i < cols.length; i++) {
-        if (_str.contains(cols[i], "pos")) {
-            cols[i] = "positions";
-        }
-    }
+var normalizer = transform(function(player) {
+    player.player_id = utils.getPlayerId(player.first_name, player.last_name);
+    player.positions = positions.normalize(player.positions);
+    projections.normalizeStats(player);
 
-    return cols;
-}
+    return player;
+});
 
 // adds player IDs, removes specific "OF" positions, removes DH unless it's the only position, and sorts positions
 var normalizeFile = function(uploadFile) {
     if (uploadFile) {
-        var file = openCSV(uploadFile);
-        var parser = parse({ columns: normalizeColumns });
+        var stream = file.openCSV(uploadFile);
+        var parser = parse({ columns: true });
         var stringer = stringify({ header: true });
 
-        var players = [];
-
-        var transformer = transform(function(player) {
-            player.player_id = utils.getPlayerId(player.first_name, player.last_name);
-            player.positions = positions.normalize(player.positions);
-                
-            return player;
-        });
-
-        file.pipe(parser).pipe(transformer).pipe(stringer).pipe(writeCSV('..\\data\\' + _str.strLeftBack(uploadFile, ".") + '-normalized.csv'));
+        stream.pipe(parser).pipe(normalizer).pipe(stringer).pipe(file.writeCSV('..\\data\\' + _str.strLeftBack(uploadFile, ".") + '-normalized.csv'));
     } else {
-        console.log("Enter a CSV file to read!");
+        console.log("enter a CSV file to read!");
     }
 };
 
@@ -77,7 +68,7 @@ var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
         var allPlayers = _.union.apply(this, playerLists);
         var allLastNames = _.union.apply(this, lastNameLists);
 
-        var fileStream = openCSV(fileToStrip);
+        var fileStream = file.openCSV(fileToStrip);
 
         var parser = parse({ columns: true });
         var stringer = stringify({ header: true });
@@ -93,7 +84,7 @@ var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
 
         var pipe = fileStream.pipe(parser).pipe(transformer); 
         if (!dryRun) {
-            pipe.pipe(stringer).pipe(writeCSV('..\\data\\' + _str.strLeftBack(fileToStrip, ".") + '-stripped.csv'));
+            pipe.pipe(stringer).pipe(file.writeCSV('..\\data\\' + _str.strLeftBack(fileToStrip, ".") + '-stripped.csv'));
         }
     };
 
@@ -102,7 +93,7 @@ var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
     filesToCompare.forEach(function(file, index) {
         playerLists.push([]);
         lastNameLists.push([]);
-        var fileStream = openCSV(file);
+        var fileStream = file.openCSV(file);
 
         var parser = parse({ columns: true });
 
@@ -123,8 +114,12 @@ var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
 
 var scrapeESPN = function(outputFile, pitchers) {
     var baseUrl = "http://games.espn.go.com/flb/tools/projections?display=alt&startIndex=";
+    var pageIndex = 0;
 
-    var outputStream = writeCSV(outputFile);
+    var maxPlayers = (pitchers ? 300 : 400);
+    var playersPerPage = 15; // for ESPN, we need to scrape 15 players at a time
+
+    var outputStream = file.writeCSV(outputFile);
     if (outputStream) {
         var requests = [];
         var parser = new parsers.ESPNParser(pitchers ? positions.PitcherSelector : positions.BatterSelector);
@@ -139,13 +134,16 @@ var scrapeESPN = function(outputFile, pitchers) {
         Q.all(requests).then(function(allData) {
             console.log("all requests done, writing file!");
 
-            var stringer = stringify();
+            var parser = parse({ columns: true });
 
-            stringer.pipe(outputStream);
+            var downloadStringer = stringify(),
+                outputStringer = stringify({ header: true });
+
+            downloadStringer.pipe(parser).pipe(normalizer).pipe(outputStringer).pipe(outputStream);
 
             allData.forEach(function(requestData) {
                 requestData.forEach(function(row) {
-                    stringer.write(row);
+                    downloadStringer.write(row);
                 });
             });
 
@@ -162,7 +160,7 @@ var scrapeCBS = function(outputFile, pitchers) {
     var maxPlayersPerPosition = (pitchers ? 250 : 150);
     var playersPerPage = 50; // for CBS, we need to scrape 50 players at a time
 
-    var outputStream = writeCSV(outputFile);
+    var outputStream = file.writeCSV(outputFile);
     if (outputStream) {
         var requests = [];
 
@@ -183,17 +181,20 @@ var scrapeCBS = function(outputFile, pitchers) {
             console.log("all requests done, writing file!");
 
             var allPlayers = [];
-            var stringer = stringify();
 
             // remove duplicates
             var transformer = transform(function(player) {
                 if (!_.contains(allPlayers, player[0])) {
                     allPlayers.push(player[0]);
+
                     return player;
                 }
             });
 
-            transformer.pipe(stringer).pipe(outputStream);
+            var parser = parse({ columns: true });
+            var stringer = stringify({ header: true });
+
+            transformer.pipe(stringify()).pipe(parser).pipe(normalizer).pipe(stringer).pipe(outputStream);
 
             allData.forEach(function(requestData) {
                 requestData.forEach(function(row) {
