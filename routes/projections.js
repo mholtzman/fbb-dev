@@ -48,8 +48,6 @@ router.get('/', function(req, resp) {
                 allPlayerData[player.player_id.S] = newPlayer;
             });
 
-            console.log("all player data loaded!");
-
             db.scan({ TableName: "projections" }, function(err, data) {
                 if (err) {
                     console.error("error loading projections: ");
