@@ -18,16 +18,6 @@ mixin nav_item(href, active)
     li(class=active): a( href=href )
         block
  
-mixin nav_item_dropdown(href, active)
-    li(class=["dropdown", active])
-        a.dropdown-toggle( href=href, data-toggle="dropdown", role="button", aria-expanded="false" )= attributes.label
-            span.caret
-        ul.dropdown-menu( role="menu" )
-            block
- 
-mixin nav_divider
-    li.divider
- 
 mixin nav_header
     li.dropdown-header
         block
@@ -38,21 +28,40 @@ mixin position_sort_toolbar
 
 mixin position_sort(position, hideDot, active)
     li( role="presentation" )
-        span.position-sorter( class=active, id=position )= position
+        span.table-filter-item.position-sorter( class=active, id=position )= position
         unless hideDot
             | &#183
+
+mixin league_filter_toolbar
+    ul.nav.nav-pills( id="league-filter-toolbar" )
+        block
+
+mixin league_filter(league, hideDot, active)
+    li( role="presentation" )
+        span.table-filter-item.league-filter( class=active, id=league )= league
+        unless hideDot
+            | &#183
+
+mixin projection_filter(proj)
+    input.btn.btn-default( type="button", value=proj )
 
 mixin stats_legend
     tr
         th Name
         th Team
         th Position(s)
+        th PA
         th AB
         th H
-        th AVG
         th R
         th RBI
         th HR
         th SB
-        th SGP
-        th aSGP
+        th CS
+        th AVG
+        th OBP
+        th SLG
+        th OPS
+
+mixin stats_table
+    tr

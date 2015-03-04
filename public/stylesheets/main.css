@@ -1,6 +1,6 @@
-.table-wrapper {
+#content {
     width: 80%;
-    padding: 0px 40px;
+    padding-left: 40px;
 }
 
 .table-wrapper tr {
@@ -11,20 +11,24 @@
     margin-bottom: 30px;
 }
 
-.position-sorter {
+.table-filter-item {
     padding-right: 2px;
 }
 
-.position-sorter.active {
+.table-filter-item {
+    padding-right: 2px;
+}
+
+.table-filter-item.active {
     font-weight: bold;
     color: red;
 }
 
-.position-sorter:not(.active):hover {
+.table-filter-item:not(.active):hover {
     color: #0099ff;
 }
 
-.position-sorter:hover {
+.table-filter-item:hover {
     cursor: pointer;
 }
 

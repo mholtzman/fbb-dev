@@ -1,39 +1,24 @@
 $(document).ready(function() {
     var table = $('#players-table').DataTable({
-        dom: 'l<"toolbar">frtp',
         info: false,
         pageLength: 25,
         pagingType: 'simple',
         lengthMenu: [ 25, 50, 100 ],
-        order: [[11, 'desc']],
+        order: [[14, 'desc']],
         columns: [
-            { name: 'name' },
-            { name: 'team' },
-            { name: 'positions' },
-            { name: 'ab' },
-            { name: 'hits' },
-            { name: 'avg' },
-            { name: 'r' },
-            { name: 'rbi' },
-            { name: 'hr' },
-            { name: 'sb' },
-            { name: 'sgp' },
-            { name: 'aSGP' }
+            { name: "name", searchable: true, orderable: false },
+            { name: "team", searchable: true, orderable: false },
+            { name: "positions", searchable: true, orderable: false },
+            null, null, null, null, null, null, null, null, null, null, null, null
         ],
         columnDefs: [
-            { targets: [3,4,5,6,7,8,9,10,11], orderSequence: ['desc'], searchable: false },
-            { targets: [0,1,2], searchable: true, orderable: false } // these columns can be filtered, but not sored
+            { targets: '_all', orderSequence: ['desc'], searchable: false }
             
         ]
     });
 
-    var toolbar = $("div.toolbar");
-
-    var posToolbar = $("#position-sort-toolbar");
-    posToolbar.detach();
-    posToolbar.appendTo(toolbar);
-
-    initPositionSorters(table, toolbar);
+    initPositionSorters(table);
+    initLeagueFilter(table);
 
     var searchBox = $('#players-table_filter input');
 
@@ -46,13 +31,10 @@ $(document).ready(function() {
     });
 } );
 
-function getPlayerPosition(player) {
-    return 'SS';
-}
-
 var selectedSorter;
+var selectedFilter;
 
-function initPositionSorters(table, toolbar) {
+function initPositionSorters(table) {
     var sorters = $(".position-sorter");
     selectedSorter = $(sorters[0]);
 
@@ -66,6 +48,28 @@ function initPositionSorters(table, toolbar) {
             selectedSorter = sorter;
         });
     });
+}
+
+function initLeagueFilter(table) {
+    var filters = $(".league-filter");
+    selectedFilter = $(filters[0]);
+
+    filters.each(function(index) {
+        var filter = $(this);
+
+        filter.click(function() {
+            selectedFilter.removeClass('active');
+            filter.addClass('active');
+            table.column( 'team:name' ).search(leagueSearches[filter.text()], true).draw();
+            selectedFilter = filter;
+        });
+    });
+}
+
+var leagueSearches = {
+    All: "",
+    AL: "NYY|BOS|TOR|BAL|TB|CHA|DET|CLE|KC|MIN|OAK|TEX|HOU|LAA|SEA",
+    NL: "NYN|ATL|WAS|MIA|PHI|CHN|PIT|STL|MIL|CIN|COL|SD|SF|ARI|LAD"
 }
 
 var positionSearches = {
