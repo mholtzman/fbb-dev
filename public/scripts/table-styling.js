@@ -22,6 +22,23 @@ var ops = function(row) {
 
     return "";
 };
+var positions = function(row) {
+    var positions = row.positions;
+
+    if (positions) {
+        var pos = positions.espn;
+        if (!pos) {
+            pos = positions.cbs;
+            if (!pos) {
+                pos = positions.zips;
+            }
+        }
+
+        return pos;
+    }
+
+    return "";
+};
 
 var INITIAL_SORT = "ops";
 var DATA_URL = "/projections";
@@ -40,7 +57,7 @@ $(document).ready(function() {
     var columns = [
             { name: "name", title: "Name", data: "name", searchable: true, orderable: false },
             { name: "team", title: "Team", data: "team", searchable: true, orderable: false },
-            { name: "positions", title: "Positions", data: "positions", render: "zips.[, ]", searchable: true, orderable: false },
+            { name: "positions", title: "Positions", data: positions, searchable: true, orderable: false },
             { name: "plate_appearances", title: "PA", data: "projections.pa", render: noDecimals },
             { name: "at_bats", title: "AB", data: "projections.ab", render: noDecimals },
             { name: "hits", title: "H", data: "projections.h", render: noDecimals },
