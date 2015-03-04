@@ -17,6 +17,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/players', players);
 app.use('/projections', projections);
 
+app.use('/', function(req, resp) {
+    resp.render('projections');
+});
+
 app.listen(port, function() {
     console.log("server started listening on port: " + port);
 });

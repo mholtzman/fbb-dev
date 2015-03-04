@@ -3,6 +3,18 @@
     padding-left: 40px;
 }
 
+.filters {
+    display: flex;
+    justify-content: space-between;
+    width: 25%;
+}
+
+.sorters {
+    display: flex;
+    flex-direction: column;
+    padding-top: 10px;
+}
+
 .table-wrapper tr {
     line-height: 10px;
 }

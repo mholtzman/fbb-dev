@@ -1,62 +1,40 @@
 extends site-layout
 
 block head
+    link( href='/stylesheets/awesome-bootstrap-checkbox.css', rel='stylesheet' )
+    link(href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet")
     script( src='//cdn.datatables.net/1.10.5/js/jquery.dataTables.min.js' )
     script( src='/scripts/table-styling.js' )
 
 block content
     .filters
-        .filter
-            +position_sort_toolbar
-                +position_sort('All', false, "active")
-                +position_sort('C')
-                +position_sort('1B')
-                +position_sort('2B')
-                +position_sort('3B')
-                +position_sort('SS')
-                +position_sort('OF')
-                +position_sort('CI')
-                +position_sort('MI')
-                +position_sort('DH', true)
+        .sorters
+            .filter
+                +position_sort_toolbar
+                    +position_sort('All', false, "active")
+                    +position_sort('C')
+                    +position_sort('1B')
+                    +position_sort('2B')
+                    +position_sort('3B')
+                    +position_sort('SS')
+                    +position_sort('OF')
+                    +position_sort('CI')
+                    +position_sort('MI')
+                    +position_sort('DH', true)
 
-        .filter
-            +league_filter_toolbar
-                +league_filter('All', false, "active")
-                +league_filter('AL')
-                +league_filter('NL', true)
+            .filter
+                +league_filter_toolbar
+                    +league_filter('All', false, "active")
+                    +league_filter('AL')
+                    +league_filter('NL', true)
 
         .filter
             span.projection_filters
-                +projection_filter('ESPN')
+                +projection_filter('ZiPS', true)
+                +projection_filter('ESPN', false)
                 +projection_filter('CBS')
-                +projection_filter('ZiPS')
 
     .table-wrapper
             h1 Player Projections
             table.display( id='players-table', cellspacing=0, width="100%" )
-                thead
-                    +stats_legend
-
-                tfoot
-                    +stats_legend
-
-                tbody
-                    each player, key in players
-                        if player.projections.zips
-                            tr
-                                td= player.name
-                                td= player.team
-                                td= player.positions.zips
-                                td= player.projections.zips.pa
-                                td= player.projections.zips.ab
-                                td= player.projections.zips.h
-                                td= player.projections.zips.r
-                                td= player.projections.zips.rbi
-                                td= player.projections.zips.hr
-                                td= player.projections.zips.sb
-                                td= player.projections.zips.cs
-                                td= player.projections.zips.avg.toFixed(3)
-                                td= player.projections.zips.obp.toFixed(3)
-                                td= player.projections.zips.slg.toFixed(3)
-                                td= (player.projections.zips.obp + player.projections.zips.slg).toFixed(3)
             
