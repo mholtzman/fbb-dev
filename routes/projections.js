@@ -79,6 +79,11 @@ var loadProjectionData = function() {
     return load.promise;
 };
 
+router.get('/reload', function(req, resp) {
+    loadPlayerData().then(loadProjectionData);
+
+    resp.end();
+});
 
 router.get('/', function(req, resp) {
     var sites = _.flatten([req.query.site]);
