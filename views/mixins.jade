@@ -1,7 +1,7 @@
 //- Navbar mixins
 mixin nav(name, id, style)
     - var style = (typeof style === 'undefined') ? "default" : style
-    nav( role="navigation", class=["navbar", "navbar-" + style] )
+    nav#title-nav( role="navigation", class=["navbar", "navbar-" + style] )
         .navbar-header
             button.navbar-toggle.collapsed( type="button", data-toggle="collapse", data-target="#" + id, aria-expanded="false", aria-controls="navbar")
                 span.sr-only Toggle navigation
@@ -15,7 +15,7 @@ mixin nav(name, id, style)
                 block
  
 mixin nav_item(href, active)
-    li(class=active): a( href=href )
+    li(class=active): a.page-chooser( href=href )
         block
  
 mixin nav_header

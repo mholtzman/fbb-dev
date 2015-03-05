@@ -31,8 +31,9 @@ block content
         .filter
             span.projection_filters
                 +projection_filter('ZiPS', true)
-                +projection_filter('ESPN', false)
-                +projection_filter('CBS')
+                +projection_filter('Steamer', true)
+                +projection_filter('ESPN', true)
+                +projection_filter('CBS', true)
 
     .table-wrapper
             h1 Player Projections

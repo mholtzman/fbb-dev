@@ -4,7 +4,7 @@ var fs = require('fs'),
     aws = require('aws-sdk'),
     _ = require('underscore'),
     _str = require('underscore.string'),
-    upload = require('./upload');
+    upload = require('./upload-utils');
 
 var db = new aws.DynamoDB({ region: 'us-east-1' });
 

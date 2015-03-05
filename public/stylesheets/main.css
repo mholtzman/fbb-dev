@@ -3,6 +3,22 @@
     padding-left: 40px;
 }
 
+#title-nav {
+    background-color: #428bca;
+}
+
+#title-nav .navbar-brand:hover, 
+#title-nav .navbar-brand:focus {
+  background-color: transparent;
+  color: #999999;
+  cursor: default;
+  color: white;
+}
+
+#title-nav .active > .page-chooser {
+    background-color: #336699
+}
+
 .filters {
     display: flex;
     justify-content: space-between;

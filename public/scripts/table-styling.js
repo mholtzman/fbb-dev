@@ -53,6 +53,10 @@ function getRequestedSites(data) {
     data.site = checkedSites;
 }
 
+function getSearchBox() {
+    return $('#players-table_filter input');
+}
+
 $(document).ready(function() {
     var columns = [
             { name: "name", title: "Name", data: "name", searchable: true, orderable: false },
@@ -93,11 +97,13 @@ $(document).ready(function() {
     initLeagueFilter(table);
     initProjectionFilters(table);
 
-    var searchBox = $('#players-table_filter input');
+    var searchBox = getSearchBox();
 
     // need to remove these to override the default search functionality
     searchBox.off('input');
     searchBox.off('keyup');
+
+    searchBox
 
     searchBox.on('keyup', function(data, next) {
         table.column( 'name:name' ).search(searchBox.val()).draw();
@@ -115,10 +121,16 @@ function initPositionSorters(table) {
         var sorter = $(this);
 
         sorter.click(function() {
+            // maintain the state of the search text
+            var searchBox = getSearchBox();
+            var savedVal = getSearchBox().val();
+
             selectedSorter.removeClass('active');
             sorter.addClass('active');
             table.column( 'positions:name' ).search(positionSearches[sorter.text()], true).draw();
             selectedSorter = sorter;
+
+            searchBox.val(savedVal);
         });
     });
 }
@@ -131,10 +143,16 @@ function initLeagueFilter(table) {
         var filter = $(this);
 
         filter.click(function() {
+            // maintain the state of the search text
+            var searchBox = getSearchBox();
+            var savedVal = getSearchBox().val();
+
             selectedFilter.removeClass('active');
             filter.addClass('active');
             table.column( 'team:name' ).search(leagueSearches[filter.text()], true).draw();
             selectedFilter = filter;
+
+            searchBox.val(savedVal);
         });
     });
 }

@@ -39,8 +39,19 @@ var getPlayerNames = function(uploadFile, callback, batters, pitchers) {
 };
 
 var normalizer = transform(function(player) {
+    if (player.name) {
+        var name = player.name.split(" ");
+        player.first_name = name[0];
+        player.last_name = _.rest(name, 1).join(" ");
+        delete player.name;
+    }
+
     player.player_id = utils.getPlayerId(player.first_name, player.last_name);
-    player.positions = positions.normalize(player.positions);
+
+    if (player.positions) {
+        player.positions = positions.normalize(player.positions);
+    }
+
     projections.normalizeStats(player);
 
     return player;
@@ -82,6 +93,10 @@ var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
             }
         });
 
+        transformer.on('finish', function() {
+            console.log("====================\n   TOTAL: " + allPlayers.length);
+        });
+
         var pipe = fileStream.pipe(parser).pipe(transformer); 
         if (!dryRun) {
             pipe.pipe(stringer).pipe(file.writeCSV('..\\data\\' + _str.strLeftBack(fileToStrip, ".") + '-stripped.csv'));
@@ -90,10 +105,10 @@ var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
 
     var fileDone = _.after(filesToCompare.length, removeOutliers);
 
-    filesToCompare.forEach(function(file, index) {
+    filesToCompare.forEach(function(nextFile, index) {
         playerLists.push([]);
         lastNameLists.push([]);
-        var fileStream = file.openCSV(file);
+        var fileStream = file.openCSV(nextFile);
 
         var parser = parse({ columns: true });
 
@@ -104,7 +119,7 @@ var intersectFiles = function(fileToStrip, filesToCompare, dryRun) {
         });
 
         transformer.on('finish', function() {
-            console.log("done reading " + file);
+            console.log("done reading " + nextFile);
             fileDone();
         });
 
@@ -237,7 +252,7 @@ function getSiteParam(args) {
 }
 
 function showUsage(error, util) {
-    console.error(error + "! usage: node util-scripts " + util + " <[file1, file2 ..]> --site [cbs|espn|zips]");
+    console.error(error + "! usage: node util-scripts " + util + " <[file1, file2 ..]> --site [cbs|espn|zips|steamer]");
 }
 
 var scriptName = process.argv[2];
