@@ -15,7 +15,7 @@
     "request": "^2.55.0",
     "stream-transform": "0.0.6",
     "tough-cookie": "^0.12.1",
-    "underscore": "^1.7.0",
+    "underscore": "^1.8.3",
     "underscore.string": "^3.0.3"
   },
   "devDependencies": {
